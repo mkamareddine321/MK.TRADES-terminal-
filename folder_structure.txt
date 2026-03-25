@@ -5,6 +5,14 @@ D:.
     mk_trades_architecture (2).html
     _gen_tree.ps1
     folder_structure.txt
+    README.md
+    Screenshot architecture.png
+    Screenshot probability cones.png
+    Screenshot regime detection.png
+    Screenshot Probability bands.png
+    XAUUSD_monthly_report sample.html
+    Screenshot manual GBM MJD CALC.png
+    Screenshot 2026-03-25 171433.png
     
 No subfolders exist 
 
