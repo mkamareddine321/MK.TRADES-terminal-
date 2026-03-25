@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MK.TRADES — System Architecture</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@300;400;600;700&family=Source+Code+Pro:wght@300;400;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #050508;
+    --bg2: #0a0a10;
+    --surface: #0f0f18;
+    --surface2: #14141f;
+    --border: #1a1a2e;
+    --border-glow: #1e1e3a;
+    --text: #c8c8d8;
+    --text-dim: #6a6a80;
+    --text-bright: #e8e8f0;
+    --orange: #ff6d00;
+    --cyan: #00d4d8;
+    --green: #2ebd59;
+    --red: #e8383b;
+    --purple: #8b5cf6;
+    --yellow: #fbbf24;
+    --magenta: #d946ef;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Oxanium', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(rgba(255,109,0,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,109,0,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255,109,0,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 20% 80%, rgba(0,212,216,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 60%, rgba(139,92,246,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 40px 30px 80px; }
+
+  .header { text-align: center; margin-bottom: 60px; position: relative; }
+  .header::after { content: ''; position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); width: 200px; height: 1px; background: linear-gradient(90deg, transparent, var(--orange), transparent); }
+  .logo { font-size: 14px; letter-spacing: 8px; color: var(--orange); font-weight: 300; text-transform: uppercase; margin-bottom: 8px; }
+  .title { font-size: 36px; font-weight: 700; color: var(--text-bright); letter-spacing: 2px; margin-bottom: 12px; }
+  .title span { color: var(--orange); }
+  .subtitle { font-size: 13px; color: var(--text-dim); font-weight: 300; letter-spacing: 3px; text-transform: uppercase; }
+
+  .flow-canvas { width: 100%; position: relative; margin-bottom: 50px; }
+  .flow-canvas svg { width: 100%; height: auto; display: block; }
+
+  .node-group { cursor: pointer; }
+  .node-group:hover .node-bg { filter: brightness(1.4); }
+  .node-group:hover .node-label { fill: var(--text-bright); }
+  .node-bg { transition: filter 0.3s ease; }
+  .node-label { font-family: 'Oxanium', sans-serif; font-weight: 600; transition: fill 0.3s ease; }
+  .node-sublabel { font-family: 'Source Code Pro', monospace; font-weight: 300; }
+  .flow-line { fill: none; stroke-width: 1.5; opacity: 0.6; }
+  .flow-line-glow { fill: none; stroke-width: 4; opacity: 0.15; filter: blur(2px); }
+  @keyframes flowDash { to { stroke-dashoffset: -20; } }
+  .flow-animated { stroke-dasharray: 6 4; animation: flowDash 1.5s linear infinite; }
+
+  .legend { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-bottom: 50px; }
+  .legend-item { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  .detail-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 30px; margin-top: 40px; opacity: 0; transform: translateY(10px); transition: all 0.4s ease; pointer-events: none; position: relative; overflow: hidden; }
+  .detail-panel.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .detail-panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--active-color, var(--orange)), transparent); }
+  .detail-title { font-size: 18px; font-weight: 700; color: var(--text-bright); margin-bottom: 6px; letter-spacing: 1px; }
+  .detail-file { font-family: 'Source Code Pro', monospace; font-size: 11px; color: var(--orange); margin-bottom: 16px; opacity: 0.7; }
+  .detail-desc { font-size: 13px; color: var(--text); line-height: 1.7; margin-bottom: 20px; font-weight: 300; }
+  .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .detail-stat { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; }
+  .detail-stat-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+  .detail-stat-value { font-size: 14px; color: var(--text-bright); font-weight: 600; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-top: 50px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 18px; text-align: center; transition: border-color 0.3s; }
+  .stat-card:hover { border-color: var(--orange); }
+  .stat-number { font-size: 26px; font-weight: 700; color: var(--orange); margin-bottom: 4px; font-family: 'Source Code Pro', monospace; }
+  .stat-label { font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--text-dim); }
+
+  .tooltip { position: fixed; background: var(--surface2); border: 1px solid var(--border-glow); border-radius: 6px; padding: 10px 14px; font-size: 11px; color: var(--text); pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 100; max-width: 280px; font-family: 'Source Code Pro', monospace; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .tooltip.show { opacity: 1; }
+
+  .footer { text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--border); }
+  .footer-text { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--text-dim); font-weight: 300; }
+  .footer-text span { color: var(--orange); }
+
+  @media (max-width: 768px) { .container { padding: 20px 15px 40px; } .title { font-size: 24px; } .stats-row { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo">MK.TRADES</div>
+    <div class="title">System <span>Architecture</span></div>
+    <div class="subtitle">Multi-Asset Probabilistic Forecasting &amp; Automated Trading Terminal</div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>Data Layer</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Analytics</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>Intelligence</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Orchestration</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Risk &amp; Automation</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--magenta)"></div>Presentation</div>
+  </div>
+
+  <div class="flow-canvas">
+    <svg viewBox="0 0 1200 1900" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="gO"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="gC"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="gP"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="gG"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="gR"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="aC" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#00d4d8" stroke-width="1"/></marker>
+        <marker id="aP" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#8b5cf6" stroke-width="1"/></marker>
+        <marker id="aO" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#ff6d00" stroke-width="1"/></marker>
+        <marker id="aG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#2ebd59" stroke-width="1"/></marker>
+        <marker id="aR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#e8383b" stroke-width="1"/></marker>
+        <marker id="aM" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#d946ef" stroke-width="1"/></marker>
+        <marker id="aY" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="none" stroke="#fbbf24" stroke-width="1"/></marker>
+        <linearGradient id="fC" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,212,216,0.15)"/><stop offset="100%" stop-color="rgba(0,212,216,0.03)"/></linearGradient>
+        <linearGradient id="fP" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(139,92,246,0.15)"/><stop offset="100%" stop-color="rgba(139,92,246,0.03)"/></linearGradient>
+        <linearGradient id="fO" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(255,109,0,0.15)"/><stop offset="100%" stop-color="rgba(255,109,0,0.03)"/></linearGradient>
+        <linearGradient id="fG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(46,189,89,0.15)"/><stop offset="100%" stop-color="rgba(46,189,89,0.03)"/></linearGradient>
+        <linearGradient id="fR" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(232,56,59,0.15)"/><stop offset="100%" stop-color="rgba(232,56,59,0.03)"/></linearGradient>
+        <linearGradient id="fM" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(217,70,239,0.15)"/><stop offset="100%" stop-color="rgba(217,70,239,0.03)"/></linearGradient>
+        <linearGradient id="fY" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(251,191,36,0.15)"/><stop offset="100%" stop-color="rgba(251,191,36,0.03)"/></linearGradient>
+      </defs>
+
+      <!-- Tier labels -->
+      <text x="16" y="100" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,100)" text-anchor="middle">DATA SOURCE</text>
+      <text x="16" y="310" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,310)" text-anchor="middle">DATA LAYER</text>
+      <text x="16" y="560" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,560)" text-anchor="middle">ANALYTICS</text>
+      <text x="16" y="810" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,810)" text-anchor="middle">INTELLIGENCE</text>
+      <text x="16" y="1060" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,1060)" text-anchor="middle">SCHEDULING</text>
+      <text x="16" y="1310" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,1310)" text-anchor="middle">RISK &amp; AUTO</text>
+      <text x="16" y="1560" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,1560)" text-anchor="middle">EXECUTION</text>
+      <text x="16" y="1810" fill="#4a4a5e" font-size="9" font-family="Oxanium" letter-spacing="3" transform="rotate(-90,16,1810)" text-anchor="middle">TERMINAL</text>
+
+      <!-- Separators -->
+      <line x1="50" y1="180" x2="1150" y2="180" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+      <line x1="50" y1="390" x2="1150" y2="390" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+      <line x1="50" y1="680" x2="1150" y2="680" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+      <line x1="50" y1="930" x2="1150" y2="930" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+      <line x1="50" y1="1170" x2="1150" y2="1170" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+      <line x1="50" y1="1480" x2="1150" y2="1480" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+      <line x1="50" y1="1700" x2="1150" y2="1700" stroke="#1a1a2e" stroke-width="0.5" stroke-dasharray="4 8"/>
+
+      <!-- T1: MT5 -->
+      <g class="node-group" data-node="mt5">
+        <rect class="node-bg" x="400" y="40" width="400" height="100" rx="8" fill="url(#fC)" stroke="#00d4d8" stroke-width="1.2"/>
+        <rect x="400" y="40" width="400" height="2" rx="1" fill="#00d4d8" opacity="0.8"/>
+        <text class="node-label" x="600" y="78" fill="#00d4d8" font-size="16" text-anchor="middle" font-family="Oxanium" font-weight="700">METATRADER 5</text>
+        <text class="node-sublabel" x="600" y="98" fill="#6a6a80" font-size="10" text-anchor="middle" font-family="Source Code Pro">Live Ticks · Historical Bars · Trade Execution · 13 Assets</text>
+        <text class="node-sublabel" x="600" y="116" fill="#4a4a5e" font-size="9" text-anchor="middle" font-family="Source Code Pro">Forex · Indices · Commodities</text>
+      </g>
+
+      <!-- T2: Data Layer -->
+      <g class="node-group" data-node="datamgr">
+        <rect class="node-bg" x="60" y="220" width="260" height="120" rx="8" fill="url(#fC)" stroke="#00d4d8" stroke-width="1"/>
+        <rect x="60" y="220" width="260" height="2" rx="1" fill="#00d4d8" opacity="0.6"/>
+        <text class="node-label" x="190" y="250" fill="#00d4d8" font-size="13" text-anchor="middle" font-family="Oxanium" font-weight="600">DATA MANAGER</text>
+        <text class="node-sublabel" x="190" y="268" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">data_manager/</text>
+        <text class="node-sublabel" x="190" y="290" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Parquet · SQLite · Gap Fill</text>
+        <text class="node-sublabel" x="190" y="305" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Source-Agnostic · Validated</text>
+      </g>
+
+      <g class="node-group" data-node="dataserver">
+        <rect class="node-bg" x="370" y="220" width="260" height="120" rx="8" fill="url(#fC)" stroke="#00d4d8" stroke-width="1"/>
+        <rect x="370" y="220" width="260" height="2" rx="1" fill="#00d4d8" opacity="0.6"/>
+        <text class="node-label" x="500" y="250" fill="#00d4d8" font-size="13" text-anchor="middle" font-family="Oxanium" font-weight="600">DATA SERVER</text>
+        <text class="node-sublabel" x="500" y="268" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">data_server.py — FastAPI</text>
+        <text class="node-sublabel" x="500" y="290" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">WS: prices · events (1Hz)</text>
+        <text class="node-sublabel" x="500" y="305" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">REST: 20+ endpoints</text>
+      </g>
+
+      <g class="node-group" data-node="config">
+        <rect class="node-bg" x="680" y="220" width="190" height="120" rx="8" fill="url(#fC)" stroke="#00d4d8" stroke-width="1"/>
+        <rect x="680" y="220" width="190" height="2" rx="1" fill="#00d4d8" opacity="0.6"/>
+        <text class="node-label" x="775" y="250" fill="#00d4d8" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">CONFIG MANAGER</text>
+        <text class="node-sublabel" x="775" y="268" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">config_manager.py</text>
+        <text class="node-sublabel" x="775" y="290" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Universe · Profiles</text>
+        <text class="node-sublabel" x="775" y="305" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Execution · Auto-Trade</text>
+      </g>
+
+      <g class="node-group" data-node="freshness">
+        <rect class="node-bg" x="920" y="220" width="210" height="120" rx="8" fill="url(#fY)" stroke="#fbbf24" stroke-width="1"/>
+        <rect x="920" y="220" width="210" height="2" rx="1" fill="#fbbf24" opacity="0.6"/>
+        <text class="node-label" x="1025" y="250" fill="#fbbf24" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">DATA FRESHNESS</text>
+        <text class="node-sublabel" x="1025" y="268" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">data_freshness.py</text>
+        <text class="node-sublabel" x="1025" y="290" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">9 Types / Asset Monitored</text>
+        <text class="node-sublabel" x="1025" y="305" fill="#fbbf24" font-size="8" text-anchor="middle" font-family="Source Code Pro" opacity="0.7">Gates Signal Engine</text>
+      </g>
+
+      <!-- T3: Analytics -->
+      <g class="node-group" data-node="walkforward"><rect class="node-bg" x="60" y="430" width="185" height="85" rx="8" fill="url(#fP)" stroke="#8b5cf6" stroke-width="1"/><rect x="60" y="430" width="185" height="2" rx="1" fill="#8b5cf6" opacity="0.6"/><text class="node-label" x="152" y="460" fill="#8b5cf6" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">WALK-FORWARD</text><text class="node-sublabel" x="152" y="476" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">walk_forward_engine.py</text><text class="node-sublabel" x="152" y="500" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">IS/OOS · Multi-Window</text></g>
+      <g class="node-group" data-node="garch"><rect class="node-bg" x="270" y="430" width="150" height="85" rx="8" fill="url(#fP)" stroke="#8b5cf6" stroke-width="1"/><rect x="270" y="430" width="150" height="2" rx="1" fill="#8b5cf6" opacity="0.6"/><text class="node-label" x="345" y="460" fill="#8b5cf6" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">GARCH</text><text class="node-sublabel" x="345" y="476" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">garch_module.py</text><text class="node-sublabel" x="345" y="500" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">GJR · EGARCH · YZ Blend</text></g>
+      <g class="node-group" data-node="hmm"><rect class="node-bg" x="445" y="430" width="150" height="85" rx="8" fill="url(#fP)" stroke="#8b5cf6" stroke-width="1"/><rect x="445" y="430" width="150" height="2" rx="1" fill="#8b5cf6" opacity="0.6"/><text class="node-label" x="520" y="460" fill="#8b5cf6" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">HMM REGIME</text><text class="node-sublabel" x="520" y="476" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">hmm_regime_module.py</text><text class="node-sublabel" x="520" y="500" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Calm · Normal · Stressed</text></g>
+      <g class="node-group" data-node="ou"><rect class="node-bg" x="620" y="430" width="150" height="85" rx="8" fill="url(#fP)" stroke="#8b5cf6" stroke-width="1"/><rect x="620" y="430" width="150" height="2" rx="1" fill="#8b5cf6" opacity="0.6"/><text class="node-label" x="695" y="460" fill="#8b5cf6" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">OU ANALYSIS</text><text class="node-sublabel" x="695" y="476" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">ou_mean_reversion.py</text><text class="node-sublabel" x="695" y="500" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Hurst · ADF · Half-Life</text></g>
+      <g class="node-group" data-node="gpu"><rect class="node-bg" x="795" y="430" width="150" height="85" rx="8" fill="url(#fP)" stroke="#8b5cf6" stroke-width="1"/><rect x="795" y="430" width="150" height="2" rx="1" fill="#8b5cf6" opacity="0.6"/><text class="node-label" x="870" y="460" fill="#8b5cf6" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">GPU ENGINE</text><text class="node-sublabel" x="870" y="476" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">PyTorch CUDA</text><text class="node-sublabel" x="870" y="500" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">RTX 5090 · 10-50×</text></g>
+      <g class="node-group" data-node="calibration"><rect class="node-bg" x="970" y="430" width="170" height="85" rx="8" fill="url(#fY)" stroke="#fbbf24" stroke-width="1"/><rect x="970" y="430" width="170" height="2" rx="1" fill="#fbbf24" opacity="0.6"/><text class="node-label" x="1055" y="460" fill="#fbbf24" font-size="11" text-anchor="middle" font-family="Oxanium" font-weight="600">CALIBRATION</text><text class="node-sublabel" x="1055" y="476" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">calibration_store.py</text><text class="node-sublabel" x="1055" y="500" fill="#fbbf24" font-size="8" text-anchor="middle" font-family="Source Code Pro" opacity="0.7">A+→F per asset×signal</text></g>
+
+      <!-- WF bridge -->
+      <g class="node-group" data-node="wfsettings"><rect class="node-bg" x="160" y="555" width="220" height="55" rx="6" fill="url(#fP)" stroke="#8b5cf6" stroke-width="0.8" stroke-dasharray="4 3"/><text class="node-label" x="270" y="580" fill="#8b5cf6" font-size="10" text-anchor="middle" font-family="Oxanium" font-weight="600">best_wf_settings.json</text><text class="node-sublabel" x="270" y="598" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Optimal σ · μ · λ · model per asset</text></g>
+
+      <!-- T4: Intelligence -->
+      <g class="node-group" data-node="forecaster">
+        <rect class="node-bg" x="60" y="720" width="330" height="160" rx="8" fill="url(#fO)" stroke="#ff6d00" stroke-width="1.2"/>
+        <rect x="60" y="720" width="330" height="2" rx="1" fill="#ff6d00" opacity="0.8"/>
+        <text class="node-label" x="225" y="750" fill="#ff6d00" font-size="14" text-anchor="middle" font-family="Oxanium" font-weight="700">MONTE CARLO FORECASTER</text>
+        <text class="node-sublabel" x="225" y="766" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">forcasterv21_institutional_anchors.py</text>
+        <rect x="80" y="780" width="85" height="32" rx="5" fill="rgba(255,109,0,0.1)" stroke="#ff6d00" stroke-width="0.8"/>
+        <text x="122" y="794" fill="#ff6d00" font-size="9" text-anchor="middle" font-family="Oxanium" font-weight="600">GBM</text>
+        <text x="122" y="806" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Entry/Target</text>
+        <rect x="180" y="780" width="85" height="32" rx="5" fill="rgba(255,109,0,0.1)" stroke="#ff6d00" stroke-width="0.8"/>
+        <text x="222" y="794" fill="#ff6d00" font-size="9" text-anchor="middle" font-family="Oxanium" font-weight="600">MJD</text>
+        <text x="222" y="806" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Stop DNA</text>
+        <rect x="280" y="780" width="85" height="32" rx="5" fill="rgba(217,70,239,0.1)" stroke="#d946ef" stroke-width="0.8"/>
+        <text x="322" y="794" fill="#d946ef" font-size="9" text-anchor="middle" font-family="Oxanium" font-weight="600">BATES</text>
+        <text x="322" y="806" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Vol+Jump</text>
+        <text class="node-sublabel" x="225" y="840" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">→ 21 Cone Types · Bands · Anchors</text>
+        <text class="node-sublabel" x="225" y="856" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">p5 · p16 · p50 · p84 · p95</text>
+      </g>
+
+      <g class="node-group" data-node="signalengine">
+        <rect class="node-bg" x="440" y="720" width="330" height="160" rx="8" fill="url(#fO)" stroke="#ff6d00" stroke-width="1.2"/>
+        <rect x="440" y="720" width="330" height="2" rx="1" fill="#ff6d00" opacity="0.8"/>
+        <text class="node-label" x="605" y="750" fill="#ff6d00" font-size="14" text-anchor="middle" font-family="Oxanium" font-weight="700">SIGNAL ENGINE v2.1</text>
+        <text class="node-sublabel" x="605" y="766" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">signal_engine_v2.py · 6 Signal Types</text>
+        <rect x="458" y="780" width="140" height="17" rx="4" fill="rgba(255,109,0,0.08)" stroke="#ff6d00" stroke-width="0.5"/><text x="528" y="793" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">① Boundary Fade</text>
+        <rect x="612" y="780" width="140" height="17" rx="4" fill="rgba(255,109,0,0.08)" stroke="#ff6d00" stroke-width="0.5"/><text x="682" y="793" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">② Cone Breakout</text>
+        <rect x="458" y="803" width="140" height="17" rx="4" fill="rgba(255,109,0,0.08)" stroke="#ff6d00" stroke-width="0.5"/><text x="528" y="816" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">③ Convergence</text>
+        <rect x="612" y="803" width="140" height="17" rx="4" fill="rgba(255,109,0,0.08)" stroke="#ff6d00" stroke-width="0.5"/><text x="682" y="816" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">④ Regime Shift</text>
+        <rect x="458" y="826" width="140" height="17" rx="4" fill="rgba(255,109,0,0.08)" stroke="#ff6d00" stroke-width="0.5"/><text x="528" y="839" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">⑤ Anchor Breakout</text>
+        <rect x="612" y="826" width="140" height="17" rx="4" fill="rgba(255,109,0,0.08)" stroke="#ff6d00" stroke-width="0.5"/><text x="682" y="839" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">⑥ Anchor Fade</text>
+        <text class="node-sublabel" x="605" y="866" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Entry · SL · TP · Confidence · Kelly Size · ATR Cap · Grade</text>
+      </g>
+
+      <g class="node-group" data-node="mtf"><rect class="node-bg" x="830" y="730" width="180" height="55" rx="8" fill="url(#fO)" stroke="#ff6d00" stroke-width="0.8"/><text class="node-label" x="920" y="755" fill="#ff6d00" font-size="10" text-anchor="middle" font-family="Oxanium" font-weight="600">MTF CORRELATOR</text><text class="node-sublabel" x="920" y="773" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">M15·H1·H4 → ×0.60–1.15</text></g>
+      <g class="node-group" data-node="mcs"><rect class="node-bg" x="830" y="800" width="180" height="50" rx="8" fill="url(#fY)" stroke="#fbbf24" stroke-width="0.8"/><text class="node-label" x="920" y="823" fill="#fbbf24" font-size="10" text-anchor="middle" font-family="Oxanium" font-weight="600">MARKET CHARACTER</text><text class="node-sublabel" x="920" y="840" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Trend / MR / Random</text></g>
+
+      <!-- T5: Scheduling -->
+      <g class="node-group" data-node="orchestrator">
+        <rect class="node-bg" x="60" y="970" width="620" height="145" rx="8" fill="url(#fG)" stroke="#2ebd59" stroke-width="1.2"/>
+        <rect x="60" y="970" width="620" height="2" rx="1" fill="#2ebd59" opacity="0.8"/>
+        <text class="node-label" x="370" y="1000" fill="#2ebd59" font-size="14" text-anchor="middle" font-family="Oxanium" font-weight="700">ORCHESTRATOR — 5-TIER SCHEDULER</text>
+        <text class="node-sublabel" x="370" y="1016" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">orchestrator.py — The "Always-On Brain"</text>
+        <rect x="85" y="1030" width="100" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="135" y="1044" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">MONTHLY</text><text x="135" y="1053" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">WF Recalib</text>
+        <rect x="200" y="1030" width="90" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="245" y="1044" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">WEEKLY</text><text x="245" y="1053" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Forecast</text>
+        <rect x="305" y="1030" width="90" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="350" y="1044" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">DAILY</text><text x="350" y="1053" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Signals</text>
+        <rect x="410" y="1030" width="90" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="455" y="1044" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">HOURLY</text><text x="455" y="1053" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Lifecycle</text>
+        <rect x="515" y="1030" width="90" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="560" y="1044" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">MINUTE</text><text x="560" y="1053" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Exec Gate</text>
+        <text class="node-sublabel" x="370" y="1090" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">→ weekly_state · daily_signals · signal_lifecycle</text>
+      </g>
+
+      <g class="node-group" data-node="autoscheduler">
+        <rect class="node-bg" x="740" y="970" width="380" height="145" rx="8" fill="url(#fG)" stroke="#2ebd59" stroke-width="1"/>
+        <rect x="740" y="970" width="380" height="2" rx="1" fill="#2ebd59" opacity="0.6"/>
+        <text class="node-label" x="930" y="1000" fill="#2ebd59" font-size="14" text-anchor="middle" font-family="Oxanium" font-weight="700">AUTO SCHEDULER</text>
+        <text class="node-sublabel" x="930" y="1016" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">auto_scheduler.py — Unattended Recalc</text>
+        <rect x="760" y="1032" width="160" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="840" y="1046" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">WEEKLY CALC</text><text x="840" y="1055" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">Sun 21:30 UTC</text>
+        <rect x="940" y="1032" width="160" height="26" rx="5" fill="rgba(46,189,89,0.1)" stroke="#2ebd59" stroke-width="0.6"/><text x="1020" y="1046" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" font-weight="600">DAILY CALC</text><text x="1020" y="1055" fill="#4a4a5e" font-size="7" text-anchor="middle" font-family="Source Code Pro">21:30 UTC</text>
+        <text class="node-sublabel" x="930" y="1080" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Catch-up on startup · Sequential queue</text>
+        <text class="node-sublabel" x="930" y="1096" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">terminal_calc → orchestrator (per ticker)</text>
+      </g>
+
+      <!-- T6: Risk & Automation -->
+      <g class="node-group" data-node="riskgovernor">
+        <rect class="node-bg" x="60" y="1210" width="260" height="120" rx="8" fill="url(#fR)" stroke="#e8383b" stroke-width="1.2"/>
+        <rect x="60" y="1210" width="260" height="2" rx="1" fill="#e8383b" opacity="0.8"/>
+        <text class="node-label" x="190" y="1242" fill="#e8383b" font-size="13" text-anchor="middle" font-family="Oxanium" font-weight="700">RISK GOVERNOR</text>
+        <text class="node-sublabel" x="190" y="1258" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">risk_governor.py</text>
+        <text class="node-sublabel" x="190" y="1280" fill="#e8383b" font-size="8" text-anchor="middle" font-family="Source Code Pro" opacity="0.8">5 Gates: Switch · Breakers · Pos · Corr · Grade</text>
+        <text class="node-sublabel" x="190" y="1300" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Daily Loss · Profit Lock · Drawdown</text>
+        <text class="node-sublabel" x="190" y="1315" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Correlated Exposure Groups</text>
+      </g>
+
+      <g class="node-group" data-node="accountmgr">
+        <rect class="node-bg" x="360" y="1210" width="240" height="120" rx="8" fill="url(#fR)" stroke="#e8383b" stroke-width="1"/>
+        <rect x="360" y="1210" width="240" height="2" rx="1" fill="#e8383b" opacity="0.6"/>
+        <text class="node-label" x="480" y="1242" fill="#e8383b" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">ACCOUNT MANAGER</text>
+        <text class="node-sublabel" x="480" y="1258" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">account_manager.py</text>
+        <text class="node-sublabel" x="480" y="1280" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">MT5 Equity Sync · P&L Track</text>
+        <text class="node-sublabel" x="480" y="1300" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Circuit Breakers · Prop Rules</text>
+        <text class="node-sublabel" x="480" y="1315" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Daily/Weekly Auto-Reset</text>
+      </g>
+
+      <g class="node-group" data-node="autoexecutor">
+        <rect class="node-bg" x="640" y="1210" width="340" height="120" rx="8" fill="url(#fR)" stroke="#e8383b" stroke-width="1.5"/>
+        <rect x="640" y="1210" width="340" height="3" rx="1" fill="#e8383b" opacity="0.9"/>
+        <rect x="640" y="1210" width="340" height="120" rx="8" fill="none" stroke="#e8383b" stroke-width="0.5" opacity="0.3"><animate attributeName="opacity" values="0.1;0.5;0.1" dur="2s" repeatCount="indefinite"/></rect>
+        <text class="node-label" x="810" y="1242" fill="#e8383b" font-size="15" text-anchor="middle" font-family="Oxanium" font-weight="700">AUTO EXECUTOR</text>
+        <text class="node-sublabel" x="810" y="1258" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">auto_executor.py — Phase 3G</text>
+        <text class="node-sublabel" x="810" y="1280" fill="#e8383b" font-size="9" text-anchor="middle" font-family="Source Code Pro" font-weight="600" opacity="0.8">8 SAFETY GATES — DEFENSE IN DEPTH</text>
+        <text class="node-sublabel" x="810" y="1300" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Auto · Live · Cap · Conf · Grade · Dup · Gov · Lots</text>
+        <text class="node-sublabel" x="810" y="1318" fill="#fbbf24" font-size="8" text-anchor="middle" font-family="Source Code Pro">30s scan · Dry-run default · 22-field records</text>
+      </g>
+
+      <!-- T7: Execution -->
+      <g class="node-group" data-node="trademapper"><rect class="node-bg" x="60" y="1510" width="280" height="90" rx="8" fill="url(#fG)" stroke="#2ebd59" stroke-width="1"/><rect x="60" y="1510" width="280" height="2" rx="1" fill="#2ebd59" opacity="0.6"/><text class="node-label" x="200" y="1540" fill="#2ebd59" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">TRADE MAPPER</text><text class="node-sublabel" x="200" y="1556" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">trade_mapper.py</text><text class="node-sublabel" x="200" y="1575" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Signal→MT5 Ticket · Reconciliation</text><text class="node-sublabel" x="200" y="1590" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">P&L · Slippage · R-Multiple · Orphans</text></g>
+      <g class="node-group" data-node="execution"><rect class="node-bg" x="400" y="1510" width="250" height="90" rx="8" fill="url(#fG)" stroke="#2ebd59" stroke-width="1"/><rect x="400" y="1510" width="250" height="2" rx="1" fill="#2ebd59" opacity="0.6"/><text class="node-label" x="525" y="1540" fill="#2ebd59" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">EXECUTION LAYER</text><text class="node-sublabel" x="525" y="1556" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">execution_routes.py</text><text class="node-sublabel" x="525" y="1575" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Manual + Auto Orders</text><text class="node-sublabel" x="525" y="1590" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Market · Limit · Stop</text></g>
+      <g class="node-group" data-node="provider"><rect class="node-bg" x="710" y="1510" width="280" height="90" rx="8" fill="url(#fG)" stroke="#2ebd59" stroke-width="1"/><rect x="710" y="1510" width="280" height="2" rx="1" fill="#2ebd59" opacity="0.6"/><text class="node-label" x="850" y="1540" fill="#2ebd59" font-size="12" text-anchor="middle" font-family="Oxanium" font-weight="600">PROVIDER LAYER</text><text class="node-sublabel" x="850" y="1556" fill="#6a6a80" font-size="8" text-anchor="middle" font-family="Source Code Pro">mt5_provider.py</text><text class="node-sublabel" x="850" y="1575" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Abstract Interface · Aliases</text><text class="node-sublabel" x="850" y="1590" fill="#2ebd59" font-size="8" text-anchor="middle" font-family="Source Code Pro" opacity="0.6">Multi-broker ready (Phase 5)</text></g>
+
+      <!-- T8: Terminal -->
+      <g class="node-group" data-node="terminal">
+        <rect class="node-bg" x="120" y="1740" width="960" height="120" rx="8" fill="url(#fM)" stroke="#d946ef" stroke-width="1.2"/>
+        <rect x="120" y="1740" width="960" height="2" rx="1" fill="#d946ef" opacity="0.8"/>
+        <text class="node-label" x="600" y="1770" fill="#d946ef" font-size="16" text-anchor="middle" font-family="Oxanium" font-weight="700">LIVE ANALYTICAL TERMINAL</text>
+        <text class="node-sublabel" x="600" y="1787" fill="#6a6a80" font-size="9" text-anchor="middle" font-family="Source Code Pro">React + TradingView LWC v5 + WebSocket</text>
+        <rect x="140" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="176" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Chart</text>
+        <rect x="222" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="258" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Signals</text>
+        <rect x="304" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="340" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Regime</text>
+        <rect x="386" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="422" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Positions</text>
+        <rect x="468" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="504" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Orders</text>
+        <rect x="550" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="586" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Calibrate</text>
+        <rect x="632" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="668" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Settings</text>
+        <rect x="714" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="750" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Drawings</text>
+        <rect x="796" y="1800" width="72" height="18" rx="3" fill="rgba(217,70,239,0.08)" stroke="#d946ef" stroke-width="0.4"/><text x="832" y="1813" fill="#6a6a80" font-size="7" text-anchor="middle" font-family="Source Code Pro">Monitor</text>
+        <rect x="878" y="1800" width="84" height="18" rx="3" fill="rgba(232,56,59,0.12)" stroke="#e8383b" stroke-width="0.5"/><text x="920" y="1813" fill="#e8383b" font-size="7" text-anchor="middle" font-family="Source Code Pro" font-weight="600">Auto Trade</text>
+        <text class="node-sublabel" x="600" y="1845" fill="#4a4a5e" font-size="8" text-anchor="middle" font-family="Source Code Pro">Cones · Bands · Signals · Anchors · Regime · Positions · Auto Status — All Live</text>
+      </g>
+
+      <!-- ══════════ FLOW LINES ══════════ -->
+      <path class="flow-line-glow" d="M450,140 L190,220" stroke="#00d4d8"/><path class="flow-line flow-animated" d="M450,140 L190,220" stroke="#00d4d8" marker-end="url(#aC)"/>
+      <path class="flow-line-glow" d="M600,140 L500,220" stroke="#00d4d8"/><path class="flow-line flow-animated" d="M600,140 L500,220" stroke="#00d4d8" marker-end="url(#aC)"/>
+      <path class="flow-line-glow" d="M720,140 L775,220" stroke="#00d4d8"/><path class="flow-line flow-animated" d="M720,140 L775,220" stroke="#00d4d8" marker-end="url(#aC)"/>
+      <path class="flow-line-glow" d="M190,340 L152,430" stroke="#8b5cf6"/><path class="flow-line flow-animated" d="M190,340 L152,430" stroke="#8b5cf6" marker-end="url(#aP)"/>
+      <path class="flow-line-glow" d="M240,340 L345,430" stroke="#8b5cf6"/><path class="flow-line flow-animated" d="M240,340 L345,430" stroke="#8b5cf6" marker-end="url(#aP)"/>
+      <path class="flow-line-glow" d="M280,340 L520,430" stroke="#8b5cf6"/><path class="flow-line flow-animated" d="M280,340 L520,430" stroke="#8b5cf6" marker-end="url(#aP)"/>
+      <path class="flow-line-glow" d="M300,340 L695,430" stroke="#8b5cf6"/><path class="flow-line flow-animated" d="M300,340 L695,430" stroke="#8b5cf6" marker-end="url(#aP)"/>
+      <path class="flow-line-glow" d="M152,515 Q165,540 210,560" stroke="#8b5cf6"/><path class="flow-line flow-animated" d="M152,515 Q165,540 210,560" stroke="#8b5cf6" marker-end="url(#aP)"/>
+      <path class="flow-line-glow" d="M270,610 L230,720" stroke="#ff6d00"/><path class="flow-line flow-animated" d="M270,610 L230,720" stroke="#ff6d00" marker-end="url(#aO)"/>
+      <path class="flow-line-glow" d="M340,610 L570,720" stroke="#ff6d00"/><path class="flow-line flow-animated" d="M340,610 L570,720" stroke="#ff6d00" marker-end="url(#aO)"/>
+      <path class="flow-line-glow" d="M345,515 Q310,640 200,720" stroke="#ff6d00"/><path class="flow-line flow-animated" d="M345,515 Q310,640 200,720" stroke="#ff6d00" marker-end="url(#aO)"/>
+      <path class="flow-line-glow" d="M520,515 Q540,640 590,720" stroke="#ff6d00"/><path class="flow-line flow-animated" d="M520,515 Q540,640 590,720" stroke="#ff6d00" marker-end="url(#aO)"/>
+      <path class="flow-line-glow" d="M695,515 Q690,640 630,720" stroke="#ff6d00"/><path class="flow-line flow-animated" d="M695,515 Q690,640 630,720" stroke="#ff6d00" marker-end="url(#aO)"/>
+      <path class="flow-line-glow" d="M390,800 L440,800" stroke="#ff6d00"/><path class="flow-line flow-animated" d="M390,800 L440,800" stroke="#ff6d00" marker-end="url(#aO)" stroke-width="2.5"/>
+      <path class="flow-line flow-animated" d="M830,760 L770,760" stroke="#ff6d00" marker-end="url(#aO)" opacity="0.5"/>
+      <path class="flow-line flow-animated" d="M830,825 L770,825" stroke="#fbbf24" marker-end="url(#aY)" opacity="0.5"/>
+      <path class="flow-line" d="M1055,515 Q1000,620 720,720" stroke="#fbbf24" stroke-dasharray="3 5" opacity="0.25" marker-end="url(#aY)"/>
+      <path class="flow-line" d="M1025,340 Q1050,550 750,720" stroke="#fbbf24" stroke-dasharray="3 5" opacity="0.25" marker-end="url(#aY)"/>
+      <path class="flow-line-glow" d="M225,880 Q225,940 280,970" stroke="#2ebd59"/><path class="flow-line flow-animated" d="M225,880 Q225,940 280,970" stroke="#2ebd59" marker-end="url(#aG)"/>
+      <path class="flow-line-glow" d="M605,880 Q580,940 470,970" stroke="#2ebd59"/><path class="flow-line flow-animated" d="M605,880 Q580,940 470,970" stroke="#2ebd59" marker-end="url(#aG)"/>
+      <path class="flow-line-glow" d="M740,1050 L680,1050" stroke="#2ebd59"/><path class="flow-line flow-animated" d="M740,1050 L680,1050" stroke="#2ebd59" marker-end="url(#aG)" stroke-width="2"/>
+      <path class="flow-line-glow" d="M240,1115 L190,1210" stroke="#e8383b"/><path class="flow-line flow-animated" d="M240,1115 L190,1210" stroke="#e8383b" marker-end="url(#aR)"/>
+      <path class="flow-line-glow" d="M400,1115 L480,1210" stroke="#e8383b"/><path class="flow-line flow-animated" d="M400,1115 L480,1210" stroke="#e8383b" marker-end="url(#aR)"/>
+      <path class="flow-line-glow" d="M580,1115 L810,1210" stroke="#e8383b"/><path class="flow-line flow-animated" d="M580,1115 L810,1210" stroke="#e8383b" marker-end="url(#aR)"/>
+      <path class="flow-line flow-animated" d="M360,1270 L320,1270" stroke="#e8383b" marker-end="url(#aR)" opacity="0.5"/>
+      <path class="flow-line" d="M1055,515 Q1130,900 270,1260" stroke="#fbbf24" stroke-dasharray="3 5" opacity="0.15" marker-end="url(#aY)"/>
+      <path class="flow-line" d="M1055,515 Q1140,950 870,1210" stroke="#fbbf24" stroke-dasharray="3 5" opacity="0.15" marker-end="url(#aY)"/>
+      <path class="flow-line-glow" d="M810,1330 Q680,1430 525,1510" stroke="#2ebd59"/><path class="flow-line flow-animated" d="M810,1330 Q680,1430 525,1510" stroke="#2ebd59" marker-end="url(#aG)" stroke-width="2"/>
+      <path class="flow-line-glow" d="M190,1330 Q190,1430 400,1520" stroke="#e8383b"/><path class="flow-line flow-animated" d="M190,1330 Q190,1430 400,1520" stroke="#e8383b" marker-end="url(#aR)"/>
+      <path class="flow-line flow-animated" d="M400,1555 L340,1555" stroke="#2ebd59" marker-end="url(#aG)" opacity="0.5"/>
+      <path class="flow-line flow-animated" d="M650,1555 L710,1555" stroke="#2ebd59" marker-end="url(#aG)"/>
+      <path class="flow-line-glow" d="M990,1555 Q1160,900 780,140" stroke="#2ebd59"/><path class="flow-line" d="M990,1555 Q1160,900 780,140" stroke="#2ebd59" stroke-dasharray="4 6" opacity="0.2" marker-end="url(#aG)"/>
+      <path class="flow-line-glow" d="M500,350 Q50,1000 300,1740" stroke="#d946ef"/><path class="flow-line flow-animated" d="M500,350 Q50,1000 300,1740" stroke="#d946ef" opacity="0.25" marker-end="url(#aM)"/>
+      <path class="flow-line-glow" d="M370,1115 Q280,1500 400,1740" stroke="#d946ef"/><path class="flow-line flow-animated" d="M370,1115 Q280,1500 400,1740" stroke="#d946ef" opacity="0.25" marker-end="url(#aM)"/>
+      <path class="flow-line-glow" d="M200,1600 Q200,1680 500,1740" stroke="#d946ef"/><path class="flow-line flow-animated" d="M200,1600 Q200,1680 500,1740" stroke="#d946ef" opacity="0.3" marker-end="url(#aM)"/>
+
+      <!-- Particles -->
+      <circle r="2.5" fill="#00d4d8" opacity="0.9" filter="url(#gC)"><animateMotion dur="3s" repeatCount="indefinite" path="M600,140 L500,220"/></circle>
+      <circle r="2.5" fill="#00d4d8" opacity="0.9" filter="url(#gC)"><animateMotion dur="4s" repeatCount="indefinite" path="M450,140 L190,220" begin="1s"/></circle>
+      <circle r="2.5" fill="#8b5cf6" opacity="0.9" filter="url(#gP)"><animateMotion dur="3s" repeatCount="indefinite" path="M190,340 L152,430" begin="0.5s"/></circle>
+      <circle r="2.5" fill="#ff6d00" opacity="0.9" filter="url(#gO)"><animateMotion dur="2s" repeatCount="indefinite" path="M390,800 L440,800" begin="0.3s"/></circle>
+      <circle r="2.5" fill="#2ebd59" opacity="0.9" filter="url(#gG)"><animateMotion dur="3s" repeatCount="indefinite" path="M605,880 Q580,940 470,970" begin="0.8s"/></circle>
+      <circle r="2.5" fill="#2ebd59" opacity="0.9" filter="url(#gG)"><animateMotion dur="2.5s" repeatCount="indefinite" path="M740,1050 L680,1050" begin="1.5s"/></circle>
+      <circle r="2.5" fill="#e8383b" opacity="0.9" filter="url(#gR)"><animateMotion dur="3s" repeatCount="indefinite" path="M580,1115 L810,1210" begin="0.5s"/></circle>
+      <circle r="2.5" fill="#e8383b" opacity="0.8" filter="url(#gR)"><animateMotion dur="3.5s" repeatCount="indefinite" path="M810,1330 Q680,1430 525,1510" begin="1s"/></circle>
+      <circle r="2.5" fill="#d946ef" opacity="0.7"><animateMotion dur="5s" repeatCount="indefinite" path="M500,350 Q50,1000 300,1740" begin="2s"/></circle>
+      <circle r="2.5" fill="#2ebd59" opacity="0.6"><animateMotion dur="6s" repeatCount="indefinite" path="M990,1555 Q1160,900 780,140" begin="3s"/></circle>
+    </svg>
+  </div>
+
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-title" id="detailTitle"></div>
+    <div class="detail-file" id="detailFile"></div>
+    <div class="detail-desc" id="detailDesc"></div>
+    <div class="detail-grid" id="detailGrid"></div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-number">13</div><div class="stat-label">Assets Tracked</div></div>
+    <div class="stat-card"><div class="stat-number">21</div><div class="stat-label">Cone Types</div></div>
+    <div class="stat-card"><div class="stat-number">6</div><div class="stat-label">Signal Types</div></div>
+    <div class="stat-card"><div class="stat-number">3</div><div class="stat-label">MC Models</div></div>
+    <div class="stat-card"><div class="stat-number">8</div><div class="stat-label">Safety Gates</div></div>
+    <div class="stat-card"><div class="stat-number">5</div><div class="stat-label">Time Tiers</div></div>
+    <div class="stat-card"><div class="stat-number">30s</div><div class="stat-label">Auto-Scan</div></div>
+    <div class="stat-card"><div class="stat-number">22</div><div class="stat-label">Trade Record Fields</div></div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-text"><span>MK.TRADES</span> — Proprietary Multi-Asset Quantitative Trading Terminal — Fully Automated</div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const D={mt5:{title:"MetaTrader 5 Terminal",file:"MetaTrader5 Python API",color:"#00d4d8",desc:"Primary data source and execution endpoint. Real-time ticks, historical bars, and trade execution for 13 assets. Symbol alias resolution for broker-specific naming. Both manual and auto-executor orders route through MT5.",stats:[{label:"Assets",value:"13 instruments"},{label:"Classes",value:"Forex · Indices · Commodities"},{label:"Execution",value:"Manual + Auto (Phase 3G)"},{label:"Connection",value:"Local terminal (local_config.ini)"}]},datamgr:{title:"Data Management Module",file:"data_manager/ (DataManager, DataStore, DataCatalog, MT5Fetcher)",color:"#00d4d8",desc:"Centralized data access. All modules request data through DataManager — never directly from MT5. Parquet storage, SQLite catalog, smart gap-filling, validated reads. Source-agnostic fetcher pattern for future multi-broker support.",stats:[{label:"Storage",value:"Parquet + SQLite"},{label:"Pattern",value:"Source-agnostic fetcher"},{label:"Key Feature",value:"Smart gap fill + dedup"},{label:"Migration",value:"~3 lines per script"}]},dataserver:{title:"Data Server (FastAPI)",file:"data_server.py — FastAPI + Uvicorn",color:"#00d4d8",desc:"Real-time bridge between Python backend and React terminal. 1Hz batched WebSocket ticks, 20+ REST endpoints. Hosts 5 background tasks: signal lifecycle monitor, trade reconciliation (5-min), auto executor (30s), auto scheduler, and freshness polling.",stats:[{label:"Protocol",value:"WebSocket + REST"},{label:"Endpoints",value:"20+ routes"},{label:"Background",value:"5 tasks (lifecycle, recon, auto, sched, fresh)"},{label:"Tick Rate",value:"1Hz batched"}]},config:{title:"Configuration Manager",file:"config_manager.py + config_routes.py",color:"#00d4d8",desc:"Single source of truth. Universe, providers, display, execution gates, auto-trading settings, and profiles. Changes broadcast via WebSocket.",stats:[{label:"Sections",value:"Universe · Display · Execution · Auto"},{label:"Profiles",value:"Save/load named configs"},{label:"New (3G)",value:"Auto-trade settings"},{label:"Sync",value:"PATCH → WS broadcast"}]},freshness:{title:"Data Freshness Monitor",file:"data_freshness.py + freshness_routes.py",color:"#fbbf24",desc:"Type-aware staleness tracking. 9 data types per asset with custom validity semantics. Directly gates the signal engine — expired cone data blocks signal generation. Colored dots on asset list.",stats:[{label:"Data Types",value:"9 per asset"},{label:"Levels",value:"Fresh · Due · Expired · Missing"},{label:"Signal Gate",value:"Expired = no signals"},{label:"UI",value:"Colored dots + banners"}]},walkforward:{title:"Walk-Forward Engine",file:"walk_forward_engine.py",color:"#8b5cf6",desc:"Institutional-grade rolling walk-forward with IS/OOS validation. Multi-window calibration (21/42/63/126 days), multi-horizon scoring, GARCH+HMM+OU calibrators. Exports optimal params per asset.",stats:[{label:"Windows",value:"21 · 42 · 63 · 126"},{label:"Horizons",value:"3 · 5 · 8 · 13 days"},{label:"Calibrators",value:"Base + GARCH + HMM + OU"},{label:"Output",value:"best_wf_settings.json"}]},garch:{title:"GARCH Volatility",file:"garch_module.py",color:"#8b5cf6",desc:"GJR-GARCH + EGARCH for vol clustering and leverage effects. Blended with Yang-Zhang historical vol.",stats:[{label:"Models",value:"GARCH · GJR · EGARCH"},{label:"Output",value:"Blended σ forecast"},{label:"Integration",value:"Forecaster + WF"},{label:"Feature",value:"Vol term structure"}]},hmm:{title:"HMM Regime Detection",file:"hmm_regime_module.py",color:"#8b5cf6",desc:"2-3 state Gaussian HMM (Calm/Normal/Stressed). Baum-Welch + Viterbi. Drives parameter selection and signal gating. Per-bar labels for chart.",stats:[{label:"States",value:"Calm · Normal · Stressed"},{label:"Algorithm",value:"Baum-Welch + Viterbi"},{label:"Chart",value:"Per-bar regime strip"},{label:"Impact",value:"Params + signal gates"}]},ou:{title:"OU Analysis",file:"ou_mean_reversion.py",color:"#8b5cf6",desc:"Full mean-reversion pipeline: Hurst (R/S on log-returns), ADF, variance ratio, rolling half-life. Feeds MarketCharacterScore.",stats:[{label:"Metrics",value:"Hurst · ADF · VR · Half-Life"},{label:"Output",value:"MarketCharacterScore"},{label:"Classification",value:"Trend / MR / Random"},{label:"Key Fix",value:"R/S on log-returns"}]},gpu:{title:"GPU Accelerator",file:"gpu_accelerator.py",color:"#8b5cf6",desc:"PyTorch CUDA MC paths on RTX 5090. Auto CPU fallback. Multi-core parallel walk-forward.",stats:[{label:"Framework",value:"PyTorch CUDA"},{label:"GPU",value:"RTX 5090"},{label:"Speedup",value:"10-50×"},{label:"Parallelism",value:"ProcessPool"}]},calibration:{title:"Calibration Store",file:"calibration_store.py + backtest_calibration.py",color:"#fbbf24",desc:"Historical signal backtester produces A+ through F grades per asset × signal type. Consumed by signal engine (stamps each signal), risk governor (grade gate), and auto executor (minimum grade filter). CALIBRATION tab in terminal.",stats:[{label:"Grades",value:"A+ · A · B · C · D · F"},{label:"Metrics",value:"Win Rate · PF · Expectancy"},{label:"Consumers",value:"Signals · Governor · Auto Exec"},{label:"UI",value:"CALIBRATION tab + badges"}]},wfsettings:{title:"WF Settings Bridge",file:"best_wf_settings.json",color:"#8b5cf6",desc:"Validated bridge between backtesting and live. Optimal σ, μ, λ, model per asset.",stats:[{label:"Per Asset",value:"σ · μ · λ · model · window"},{label:"Written By",value:"Walk-Forward Engine"},{label:"Read By",value:"Forecaster · Signals · Bands"},{label:"Refresh",value:"Monthly"}]},forecaster:{title:"Monte Carlo Forecaster",file:"forcasterv21_institutional_anchors.py (~2,260 lines)",color:"#ff6d00",desc:"Three MC models: GBM (entries/targets), MJD (stop-loss via real jump DNA), Bates SVJ (confidence calibration). 21 cone types. Institutional anchors (week/month opens, prev H/L, VWAP).",stats:[{label:"Models",value:"GBM + MJD + Bates SVJ"},{label:"Cones",value:"21 types (7 per model)"},{label:"Percentiles",value:"p5 · p16 · p50 · p84 · p95"},{label:"Anchors",value:"Week/Month opens · H/L · VWAP"}]},signalengine:{title:"Signal Engine v2.1",file:"signal_engine_v2.py (~2,340 lines)",color:"#ff6d00",desc:"Six signal types with ATR-based target capping, max R:R 10:1 gate, and regime shift action (reduce instead of flatten). Each signal stamped with calibration grade. Freshness-gated. Multi-model: GBM entries, MJD stops, Bates confidence.",stats:[{label:"Signals",value:"6 types"},{label:"Per Signal",value:"Entry · SL · TP · Conf · Size · Grade"},{label:"New (v2.1)",value:"ATR cap · R:R gate · Regime reduce"},{label:"Lifecycle",value:"PENDING → ACTIVE → CLOSED"}]},mtf:{title:"MTF Correlator",file:"mtf_correlator.py",color:"#ff6d00",desc:"M15/H1/H4 directional agreement → confidence multiplier (×0.60 to ×1.15).",stats:[{label:"Timeframes",value:"M15 · H1 · H4"},{label:"3/3",value:"×1.15"},{label:"0/3",value:"×0.60"},{label:"Type",value:"Post-signal filter"}]},mcs:{title:"Market Character Score",file:"Inside signal_engine_v2.py",color:"#fbbf24",desc:"Hurst + ADF + Regime → Trending, Mean-Reverting, or Random. Gates signal type eligibility.",stats:[{label:"Inputs",value:"Hurst · ADF · Regime"},{label:"Output",value:"Score + Character"},{label:"Effect",value:"Signal type gate"},{label:"Refresh",value:"Per eval cycle"}]},orchestrator:{title:"Orchestrator — 5-Tier Scheduler",file:"orchestrator.py (~1,090 lines)",color:"#2ebd59",desc:"The always-on brain. MONTHLY (WF recalibration), WEEKLY (forecaster + cones), DAILY (signals), HOURLY (lifecycle monitor), MINUTE (execution gate). Triggered manually or by Auto Scheduler.",stats:[{label:"Tiers",value:"Monthly · Weekly · Daily · Hourly · Minute"},{label:"State Files",value:"weekly_state · signals · lifecycle"},{label:"Trigger",value:"Manual + Auto Scheduler"},{label:"Pattern",value:"Subprocess (no deadlock)"}]},autoscheduler:{title:"Auto Scheduler",file:"auto_scheduler.py",color:"#2ebd59",desc:"Schedule-based recalculation for unattended operation. Weekly: configurable day+time → terminal_calc for all tickers → orchestrator. Daily: configurable time → orchestrator daily. Catches up on startup if runs were missed. Sequential job queue.",stats:[{label:"Weekly",value:"Sun 21:30 UTC (configurable)"},{label:"Daily",value:"21:30 UTC (skip weekends)"},{label:"Catch-up",value:"On startup if missed"},{label:"Queue",value:"Sequential (one at a time)"}]},riskgovernor:{title:"Risk Governor",file:"risk_governor.py",color:"#e8383b",desc:"Pre-trade circuit breaker. Every order — manual or automated — must pass. Five gates: master switch, circuit breakers (daily loss/profit lock/drawdown), max positions (real MT5), correlated exposure (metals/FX/equity/energy groups), calibration grade filter.",stats:[{label:"Gates",value:"5 (switch · breakers · pos · corr · grade)"},{label:"Breakers",value:"Daily loss · Profit lock · Drawdown"},{label:"Groups",value:"Metals · USD · Equity · Energy"},{label:"Scope",value:"Manual + Auto orders"}]},accountmgr:{title:"Account Manager",file:"account_manager.py (~390 lines)",color:"#e8383b",desc:"Real account state with MT5 equity sync. Persistent daily/weekly P&L tracking. Configurable prop firm rules. Circuit breakers fire on limit breach and halt all trading.",stats:[{label:"Sync",value:"MT5 live equity"},{label:"Tracking",value:"Daily + Weekly + Total P&L"},{label:"Persistence",value:"account_state.json"},{label:"Breakers",value:"Auto-halt on limit breach"}]},autoexecutor:{title:"Auto Executor — Phase 3G",file:"auto_executor.py",color:"#e8383b",desc:"Automated signal-to-order execution. Scans approved signals every 30s. Eight safety gates: (1) auto master switch, (2) live_trading ON, (3) daily trade cap, (4) confidence threshold, (5) calibration grade, (6) duplicate position check, (7) risk governor validation, (8) broker lot enforcement. Defaults to dry-run mode. Records 22 fields per trade for performance analysis.",stats:[{label:"Safety Gates",value:"8 (defense in depth)"},{label:"Scan",value:"Every 30 seconds"},{label:"Default",value:"Dry-run (log only)"},{label:"Records",value:"22 fields per trade"}]},trademapper:{title:"Trade Mapper",file:"trade_mapper.py + trade_mapper_routes.py",color:"#2ebd59",desc:"Signal-to-trade attribution. Encodes signal ID in MT5 comments (MK|type|id). Background reconciliation (5-min) matches closed trades to signals. Tracks P&L, slippage, R-multiple. Detects orphaned trades.",stats:[{label:"Encoding",value:"MK|type|id in MT5 comment"},{label:"Recon",value:"5-min background loop"},{label:"Metrics",value:"P&L · Slippage · R-multiple"},{label:"Detection",value:"Orphan trades flagged"}]},execution:{title:"Execution Layer",file:"execution_routes.py",color:"#2ebd59",desc:"Config-gated (OFF by default). Handles manual orders (OrderTicket UI) and automated orders (Auto Executor). Signal-sourced orders get calibration lookup and governor validation.",stats:[{label:"Safety",value:"Config-gated (OFF default)"},{label:"Types",value:"Market · Limit · Stop"},{label:"Sources",value:"Manual UI + Auto Executor"},{label:"Attribution",value:"Signal ID → Trade Mapper"}]},provider:{title:"Provider Layer",file:"providers/mt5_provider.py + base_provider.py",color:"#2ebd59",desc:"Abstract interface for broker-agnostic execution. MT5Provider in production. Adding new brokers (Rithmic, Binance) requires only implementing BaseProvider — no existing code changes.",stats:[{label:"Current",value:"MT5Provider"},{label:"Interface",value:"connect · bars · ticks · orders"},{label:"Future",value:"Rithmic · Binance (Phase 5)"},{label:"Pattern",value:"Factory + abstract base"}]},terminal:{title:"Live Analytical Terminal",file:"terminal_app/ — React + TradingView LWC v5",color:"#d946ef",desc:"Unified dashboard. LWC v5 with 21 cone overlays, bands, signal markers, regime strips, anchors, trade history. Tabs: Chart, Quant, Calibration. Multi-chart, drawings, themes, profiles. New: auto-trade controls in Settings, freshness badges, calibration grades on signal cards, auto-trade status.",stats:[{label:"Charts",value:"LWC v5 + 15+ components"},{label:"Tabs",value:"Chart · Quant · Calibration"},{label:"New (3G)",value:"Auto-trade Settings + Status"},{label:"Features",value:"Multi-tab · Drawings · Themes"}]}};
+const dp=document.getElementById('detailPanel'),dt=document.getElementById('detailTitle'),df=document.getElementById('detailFile'),dd=document.getElementById('detailDesc'),dg=document.getElementById('detailGrid'),tt=document.getElementById('tooltip');
+document.querySelectorAll('.node-group').forEach(n=>{n.addEventListener('click',()=>{const d=D[n.dataset.node];if(!d)return;dp.style.setProperty('--active-color',d.color);dt.textContent=d.title;dt.style.color=d.color;df.textContent=d.file;dd.textContent=d.desc;dg.innerHTML=d.stats.map(s=>`<div class="detail-stat"><div class="detail-stat-label">${s.label}</div><div class="detail-stat-value">${s.value}</div></div>`).join('');dp.classList.add('active');dp.scrollIntoView({behavior:'smooth',block:'nearest'});});n.addEventListener('mouseenter',()=>{const d=D[n.dataset.node];if(d){tt.textContent=d.title+' — click for details';tt.classList.add('show');}});n.addEventListener('mousemove',e=>{tt.style.left=(e.clientX+16)+'px';tt.style.top=(e.clientY-10)+'px';});n.addEventListener('mouseleave',()=>tt.classList.remove('show'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.node-group')&&!e.target.closest('.detail-panel'))dp.classList.remove('active');});
+</script>
+</body>
+</html>

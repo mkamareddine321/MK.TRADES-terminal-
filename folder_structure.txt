@@ -1,0 +1,10 @@
+Folder PATH listing for volume SSD2TMK
+Volume serial number is 67F0-E2C5
+D:.
+    sync_project.bat
+    mk_trades_architecture (2).html
+    _gen_tree.ps1
+    folder_structure.txt
+    
+No subfolders exist 
+
