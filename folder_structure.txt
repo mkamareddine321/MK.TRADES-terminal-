@@ -15,6 +15,8 @@ D:.
     Screenshot 2026-03-25 171433.png
     USTEC_M15_2026-03-26.png
     XAUUSD_H1_2026-03-26 (3).png
+    XAUUSD_H1_2026-03-26 (4).png
+    Trade example - manual.png
     
 No subfolders exist 
 
